@@ -149,27 +149,27 @@ class YearlyWorkloadGenerator:
                 if workload_factor > 2.0:  # Major events - high load
                     url = f"{self.base_url}/work/cpu"
                     body = {
-                        "iterations": int(5000 * min(workload_factor, 3.0)),
-                        "payloadSize": int(30000 * min(workload_factor, 3.0))
+                        "iterations": min(50000000, int(20000 * min(workload_factor, 3.0))),  # Cap at 50M
+                        "payloadSize": min(1000000, int(100000 * min(workload_factor, 3.0)))  # Cap at 1M
                     }
                 elif workload_factor > 1.5:  # High load
                     url = f"{self.base_url}/work/cpu"
                     body = {
-                        "iterations": int(3000 * workload_factor),
-                        "payloadSize": int(20000 * workload_factor)
+                        "iterations": min(50000000, int(15000 * workload_factor)),  # Cap at 50M
+                        "payloadSize": min(1000000, int(80000 * workload_factor))  # Cap at 1M
                     }
                 elif workload_factor > 0.8:  # Medium load
                     url = f"{self.base_url}/work/files"
                     body = {
-                        "fileCount": int(8 * workload_factor),
-                        "fileSizeBytes": int(150000 * workload_factor),
+                        "fileCount": min(500, int(15 * workload_factor)),  # Cap at 500 files
+                        "fileSizeBytes": min(10000000, int(200000 * workload_factor)),  # Cap at 10MB
                         "prefix": f"yearly_{worker_id}"
                     }
                 else:  # Low load
                     url = f"{self.base_url}/work/files"
                     body = {
-                        "fileCount": max(1, int(3 * workload_factor)),
-                        "fileSizeBytes": int(50000 * workload_factor),
+                        "fileCount": max(1, min(500, int(5 * workload_factor))),  # Cap at 500 files
+                        "fileSizeBytes": min(10000000, int(100000 * workload_factor)),  # Cap at 10MB
                         "prefix": f"yearly_{worker_id}"
                     }
                 

@@ -100,15 +100,15 @@ class DailyWorkloadGenerator:
                     # High load: CPU-intensive work
                     url = f"{self.base_url}/work/cpu"
                     body = {
-                        "iterations": int(3000 * workload_factor),
-                        "payloadSize": int(25000 * workload_factor)
+                        "iterations": min(50000, int(10000 * workload_factor)),  # Cap at 50M iterations
+                        "payloadSize": min(1000000, int(50000 * workload_factor))  # Cap at 1M payload
                     }
                 else:
                     # Lower load: File operations
                     url = f"{self.base_url}/work/files"
                     body = {
-                        "fileCount": max(1, int(5 * workload_factor)),
-                        "fileSizeBytes": int(100000 * workload_factor),
+                        "fileCount": max(1, min(500, int(10 * workload_factor))),  # Cap at 500 files
+                        "fileSizeBytes": min(10000000, int(100000 * workload_factor)),  # Cap at 10MB per file
                         "prefix": f"daily_{worker_id}"
                     }
                 
