@@ -112,3 +112,68 @@ java -XX:CICompilerCount=1 -jar target/jitlab-0.0.1-SNAPSHOT.jar
 # Heap sizing (stabilize GC effects)
 java -Xms1g -Xmx1g -jar target/jitlab-0.0.1-SNAPSHOT.jar
 ```
+
+## Simple README
+
+### 1. Build the project
+```bash
+cd jitlab
+mvn clean package -DskipTests
+```
+
+### 2. Install Python dependencies
+```bash
+pip3 install --break-system-packages psutil httpx pandas matplotlib
+```
+
+### 3. Start the server
+```bash
+/usr/libexec/java_home -v 21 --exec java -jar target/jitlab-0.0.1-SNAPSHOT.jar
+```
+
+### 4. Verify server is running
+```bash
+curl http://localhost:8080/ping
+# Should return: pong
+```
+
+### 5. Start monitoring (in a new terminal)
+```bash
+cd jitlab
+PID=$(pgrep -f 'jitlab-0.0.1-SNAPSHOT.jar' | head -n1)
+python3 tools/monitor.py --pid $PID --interval 1 --duration 140 --out runs/monitor_cpu.csv
+```
+
+### 6. Generate CPU load (in another new terminal)
+```bash
+cd jitlab
+python3 tools/load_py.py \
+  --url http://localhost:8080/work/cpu \
+  --body '{"iterations":2000,"payloadSize":20000}' \
+  --concurrency 8 --warmupSec 10 --runSec 120 \
+  --out runs/load_cpu.csv
+```
+
+### 7. Generate file load (in another new terminal)
+```bash
+cd jitlab
+python3 tools/load_py.py \
+  --url http://localhost:8080/work/files \
+  --body '{"fileCount":10,"fileSizeBytes":262144,"prefix":"sample"}' \
+  --concurrency 4 --warmupSec 5 --runSec 120 \
+  --out runs/load_files.csv
+```
+
+### 8. Plot the results
+```bash
+cd jitlab
+MPLBACKEND=Agg python3 tools/plot.py \
+  --load runs/load_cpu.csv \
+  --monitor runs/monitor_cpu.csv \
+  --title "CPU endpoint"
+```
+
+**Notes:**
+- Run steps 3, 5, 6, and 7 in separate terminals
+- Wait for each load test to finish (~130 seconds)
+- Plotting creates PNG files in the current directory
