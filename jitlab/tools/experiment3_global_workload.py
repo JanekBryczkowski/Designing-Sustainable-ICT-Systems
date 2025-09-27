@@ -154,27 +154,49 @@ class GlobalWorkloadGenerator:
                 if stop_event.is_set():
                     break
                     
-                # Choose endpoint based on workload
-                if workload_factor > 0.8:  # High load
-                    url = f"{self.base_url}/work/cpu"
-                    body = {
-                        "iterations": min(50000000, int(12000 * workload_factor)),  # Cap at 50M
-                        "payloadSize": min(1000000, int(60000 * workload_factor))  # Cap at 1M
-                    }
-                elif workload_factor > 0.5:  # Medium load
-                    url = f"{self.base_url}/work/files"
-                    body = {
-                        "fileCount": min(500, int(12 * workload_factor)),  # Cap at 500 files
-                        "fileSizeBytes": min(10000000, int(150000 * workload_factor)),  # Cap at 10MB
-                        "prefix": f"{timezone}_{worker_id}"
-                    }
-                else:  # Low load
-                    url = f"{self.base_url}/work/files"
-                    body = {
-                        "fileCount": max(1, min(500, int(4 * workload_factor))),  # Cap at 500 files
-                        "fileSizeBytes": min(10000000, int(80000 * workload_factor)),  # Cap at 10MB
-                        "prefix": f"{timezone}_{worker_id}"
-                    }
+                # Choose endpoint based on workload (both endpoints used with different frequency)
+                if workload_factor > 0.8:  # High load: 75% CPU, 25% files
+                    if random.random() < 0.75:
+                        url = f"{self.base_url}/work/cpu"
+                        body = {
+                            "iterations": min(50000000, int(12000 * workload_factor)),  # Cap at 50M
+                            "payloadSize": min(1000000, int(60000 * workload_factor))  # Cap at 1M
+                        }
+                    else:
+                        url = f"{self.base_url}/work/files"
+                        body = {
+                            "fileCount": min(500, int(8 * workload_factor)),  # Cap at 500 files
+                            "fileSizeBytes": min(10000000, int(100000 * workload_factor)),  # Cap at 10MB
+                            "prefix": f"{timezone}_{worker_id}"
+                        }
+                elif workload_factor > 0.5:  # Medium load: 50% CPU, 50% files
+                    if random.random() < 0.5:
+                        url = f"{self.base_url}/work/cpu"
+                        body = {
+                            "iterations": min(50000000, int(8000 * workload_factor)),  # Cap at 50M
+                            "payloadSize": min(1000000, int(40000 * workload_factor))  # Cap at 1M
+                        }
+                    else:
+                        url = f"{self.base_url}/work/files"
+                        body = {
+                            "fileCount": min(500, int(12 * workload_factor)),  # Cap at 500 files
+                            "fileSizeBytes": min(10000000, int(150000 * workload_factor)),  # Cap at 10MB
+                            "prefix": f"{timezone}_{worker_id}"
+                        }
+                else:  # Low load: 15% CPU, 85% files
+                    if random.random() < 0.15:
+                        url = f"{self.base_url}/work/cpu"
+                        body = {
+                            "iterations": min(50000000, int(4000 * workload_factor)),  # Cap at 50M
+                            "payloadSize": min(1000000, int(20000 * workload_factor))  # Cap at 1M
+                        }
+                    else:
+                        url = f"{self.base_url}/work/files"
+                        body = {
+                            "fileCount": max(1, min(500, int(4 * workload_factor))),  # Cap at 500 files
+                            "fileSizeBytes": min(10000000, int(80000 * workload_factor)),  # Cap at 10MB
+                            "prefix": f"{timezone}_{worker_id}"
+                        }
                 
                 # Make request
                 start_time = time.perf_counter()

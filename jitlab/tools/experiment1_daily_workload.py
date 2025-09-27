@@ -15,6 +15,7 @@ import json
 import csv
 import math
 import httpx
+import random
 from datetime import datetime, timedelta
 
 class DailyWorkloadGenerator:
@@ -95,22 +96,39 @@ class DailyWorkloadGenerator:
                 if stop_event.is_set():
                     break
                     
-                # Choose endpoint based on workload (more CPU-intensive during high load)
+                # Choose endpoint based on workload (both endpoints used with different frequency)
+                # During high load: more CPU requests, fewer file requests
+                # During low load: more file requests, fewer CPU requests
                 if workload_factor > 0.7:
-                    # High load: CPU-intensive work
-                    url = f"{self.base_url}/work/cpu"
-                    body = {
-                        "iterations": min(50000, int(10000 * workload_factor)),  # Cap at 50M iterations
-                        "payloadSize": min(1000000, int(50000 * workload_factor))  # Cap at 1M payload
-                    }
+                    # High load: 80% CPU, 20% files
+                    if random.random() < 0.8:
+                        url = f"{self.base_url}/work/cpu"
+                        body = {
+                            "iterations": min(50000, int(10000 * workload_factor)),  # Cap at 50M iterations
+                            "payloadSize": min(1000000, int(50000 * workload_factor))  # Cap at 1M payload
+                        }
+                    else:
+                        url = f"{self.base_url}/work/files"
+                        body = {
+                            "fileCount": max(1, min(500, int(5 * workload_factor))),  # Cap at 500 files
+                            "fileSizeBytes": min(10000000, int(50000 * workload_factor)),  # Cap at 10MB per file
+                            "prefix": f"daily_{worker_id}"
+                        }
                 else:
-                    # Lower load: File operations
-                    url = f"{self.base_url}/work/files"
-                    body = {
-                        "fileCount": max(1, min(500, int(10 * workload_factor))),  # Cap at 500 files
-                        "fileSizeBytes": min(10000000, int(100000 * workload_factor)),  # Cap at 10MB per file
-                        "prefix": f"daily_{worker_id}"
-                    }
+                    # Low load: 20% CPU, 80% files
+                    if random.random() < 0.2:
+                        url = f"{self.base_url}/work/cpu"
+                        body = {
+                            "iterations": min(50000, int(5000 * workload_factor)),  # Cap at 50M iterations
+                            "payloadSize": min(1000000, int(25000 * workload_factor))  # Cap at 1M payload
+                        }
+                    else:
+                        url = f"{self.base_url}/work/files"
+                        body = {
+                            "fileCount": max(1, min(500, int(10 * workload_factor))),  # Cap at 500 files
+                            "fileSizeBytes": min(10000000, int(100000 * workload_factor)),  # Cap at 10MB per file
+                            "prefix": f"daily_{worker_id}"
+                        }
                 
                 # Make request
                 start_time = time.perf_counter()

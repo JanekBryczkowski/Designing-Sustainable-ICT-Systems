@@ -145,33 +145,63 @@ class YearlyWorkloadGenerator:
                 if stop_event.is_set():
                     break
                     
-                # Choose endpoint and parameters based on workload
-                if workload_factor > 2.0:  # Major events - high load
-                    url = f"{self.base_url}/work/cpu"
-                    body = {
-                        "iterations": min(50000000, int(20000 * min(workload_factor, 3.0))),  # Cap at 50M
-                        "payloadSize": min(1000000, int(100000 * min(workload_factor, 3.0)))  # Cap at 1M
-                    }
-                elif workload_factor > 1.5:  # High load
-                    url = f"{self.base_url}/work/cpu"
-                    body = {
-                        "iterations": min(50000000, int(15000 * workload_factor)),  # Cap at 50M
-                        "payloadSize": min(1000000, int(80000 * workload_factor))  # Cap at 1M
-                    }
-                elif workload_factor > 0.8:  # Medium load
-                    url = f"{self.base_url}/work/files"
-                    body = {
-                        "fileCount": min(500, int(15 * workload_factor)),  # Cap at 500 files
-                        "fileSizeBytes": min(10000000, int(200000 * workload_factor)),  # Cap at 10MB
-                        "prefix": f"yearly_{worker_id}"
-                    }
-                else:  # Low load
-                    url = f"{self.base_url}/work/files"
-                    body = {
-                        "fileCount": max(1, min(500, int(5 * workload_factor))),  # Cap at 500 files
-                        "fileSizeBytes": min(10000000, int(100000 * workload_factor)),  # Cap at 10MB
-                        "prefix": f"yearly_{worker_id}"
-                    }
+                # Choose endpoint and parameters based on workload (both endpoints used with different frequency)
+                if workload_factor > 2.0:  # Major events - high load: 90% CPU, 10% files
+                    if random.random() < 0.9:
+                        url = f"{self.base_url}/work/cpu"
+                        body = {
+                            "iterations": min(50000000, int(20000 * min(workload_factor, 3.0))),  # Cap at 50M
+                            "payloadSize": min(1000000, int(100000 * min(workload_factor, 3.0)))  # Cap at 1M
+                        }
+                    else:
+                        url = f"{self.base_url}/work/files"
+                        body = {
+                            "fileCount": min(500, int(8 * workload_factor)),  # Cap at 500 files
+                            "fileSizeBytes": min(10000000, int(100000 * workload_factor)),  # Cap at 10MB
+                            "prefix": f"yearly_{worker_id}"
+                        }
+                elif workload_factor > 1.5:  # High load: 70% CPU, 30% files
+                    if random.random() < 0.7:
+                        url = f"{self.base_url}/work/cpu"
+                        body = {
+                            "iterations": min(50000000, int(15000 * workload_factor)),  # Cap at 50M
+                            "payloadSize": min(1000000, int(80000 * workload_factor))  # Cap at 1M
+                        }
+                    else:
+                        url = f"{self.base_url}/work/files"
+                        body = {
+                            "fileCount": min(500, int(12 * workload_factor)),  # Cap at 500 files
+                            "fileSizeBytes": min(10000000, int(150000 * workload_factor)),  # Cap at 10MB
+                            "prefix": f"yearly_{worker_id}"
+                        }
+                elif workload_factor > 0.8:  # Medium load: 40% CPU, 60% files
+                    if random.random() < 0.4:
+                        url = f"{self.base_url}/work/cpu"
+                        body = {
+                            "iterations": min(50000000, int(8000 * workload_factor)),  # Cap at 50M
+                            "payloadSize": min(1000000, int(40000 * workload_factor))  # Cap at 1M
+                        }
+                    else:
+                        url = f"{self.base_url}/work/files"
+                        body = {
+                            "fileCount": min(500, int(15 * workload_factor)),  # Cap at 500 files
+                            "fileSizeBytes": min(10000000, int(200000 * workload_factor)),  # Cap at 10MB
+                            "prefix": f"yearly_{worker_id}"
+                        }
+                else:  # Low load: 10% CPU, 90% files
+                    if random.random() < 0.1:
+                        url = f"{self.base_url}/work/cpu"
+                        body = {
+                            "iterations": min(50000000, int(3000 * workload_factor)),  # Cap at 50M
+                            "payloadSize": min(1000000, int(20000 * workload_factor))  # Cap at 1M
+                        }
+                    else:
+                        url = f"{self.base_url}/work/files"
+                        body = {
+                            "fileCount": max(1, min(500, int(5 * workload_factor))),  # Cap at 500 files
+                            "fileSizeBytes": min(10000000, int(100000 * workload_factor)),  # Cap at 10MB
+                            "prefix": f"yearly_{worker_id}"
+                        }
                 
                 # Make request
                 start_time = time.perf_counter()
