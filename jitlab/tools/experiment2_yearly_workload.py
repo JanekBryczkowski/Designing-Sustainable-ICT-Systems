@@ -12,13 +12,13 @@ Simulates a full year with seasonal patterns and major events:
 
 import argparse
 import asyncio
-import time
-import json
 import csv
-import math
-import httpx
-from datetime import datetime, timedelta
 import random
+import time
+from datetime import datetime
+
+import httpx
+
 
 class YearlyWorkloadGenerator:
     def __init__(self, base_url="http://localhost:8080"):

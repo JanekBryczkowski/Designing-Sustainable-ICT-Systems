@@ -1,7 +1,7 @@
-/home/gras/Documents/DocumentsArchive/University/jitlab/src/main/java/com/example/jitlab/api/dto/FilesRequest.java
-/home/gras/Documents/DocumentsArchive/University/jitlab/src/main/java/com/example/jitlab/bench/Bench.java
-/home/gras/Documents/DocumentsArchive/University/jitlab/src/main/java/com/example/jitlab/api/dto/WorkResponse.java
-/home/gras/Documents/DocumentsArchive/University/jitlab/src/main/java/com/example/jitlab/api/dto/WorkRequest.java
-/home/gras/Documents/DocumentsArchive/University/jitlab/src/main/java/com/example/jitlab/api/WorkController.java
-/home/gras/Documents/DocumentsArchive/University/jitlab/src/main/java/com/example/jitlab/JitLabApplication.java
-/home/gras/Documents/DocumentsArchive/University/jitlab/src/main/java/com/example/jitlab/bench/BenchFiles.java
+/Users/jakubpataluch/IdeaProjects/Designing-Sustainable-ICT-Systems/jitlab/src/main/java/com/example/jitlab/api/dto/WorkResponse.java
+/Users/jakubpataluch/IdeaProjects/Designing-Sustainable-ICT-Systems/jitlab/src/main/java/com/example/jitlab/api/dto/FilesRequest.java
+/Users/jakubpataluch/IdeaProjects/Designing-Sustainable-ICT-Systems/jitlab/src/main/java/com/example/jitlab/api/dto/WorkRequest.java
+/Users/jakubpataluch/IdeaProjects/Designing-Sustainable-ICT-Systems/jitlab/src/main/java/com/example/jitlab/JitLabApplication.java
+/Users/jakubpataluch/IdeaProjects/Designing-Sustainable-ICT-Systems/jitlab/src/main/java/com/example/jitlab/bench/Bench.java
+/Users/jakubpataluch/IdeaProjects/Designing-Sustainable-ICT-Systems/jitlab/src/main/java/com/example/jitlab/api/WorkController.java
+/Users/jakubpataluch/IdeaProjects/Designing-Sustainable-ICT-Systems/jitlab/src/main/java/com/example/jitlab/bench/BenchFiles.java

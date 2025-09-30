@@ -1,6 +1,6 @@
 # JIT Optimization Experiments
 
-Three experiments that test how different JVM configurations affect server performance and energy consumption under realistic workloads.
+Four experiments that test how different JVM configurations affect server performance and energy consumption under realistic workloads.
 
 ## Experiment 1: Daily Workload Simulation
 
@@ -47,6 +47,19 @@ Simulates 24-hour workload patterns across different time zones compressed into 
 - **Medium load**: 50% CPU requests, 50% file requests
 - **Low load**: 15% CPU requests, 85% file requests
 - **9 workers** (3 per timezone) generating requests concurrently
+
+## Experiment 4: Burst Load Simulation
+
+### What it does
+Simulates sudden spikes in traffic followed by calm idle phases, compressed into 3 minutes:
+- **Burst phase (30s)**: Extreme traffic (flash sales, DDoS-like loads)
+- **Idle phase (15s)**: Almost no traffic
+- Repeats burst–idle cycles until experiment ends
+
+### Endpoint usage
+- **Burst phase**: 95% CPU requests, 5% file requests
+- **Idle phase**: 20% CPU requests, 80% file requests
+- **8 workers** generating requests concurrently
 
 ## JVM Configurations
 
@@ -109,6 +122,7 @@ jitlab/
 │   ├── experiment1_daily_workload.py      # Daily workload simulation
 │   ├── experiment2_yearly_workload.py     # Yearly workload simulation
 │   ├── experiment3_global_workload.py     # Global workload comparison
+│   ├── experiment4_burstload.py           # Burst workload simulation
 │   ├── run_experiments.py                 # Experiment runner
 │   ├── analyze_results.py                 # Results analysis
 │   ├── monitor.py                         # System monitoring

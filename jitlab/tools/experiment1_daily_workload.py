@@ -11,9 +11,7 @@ Simulates a typical working day with:
 import argparse
 import asyncio
 import time
-import json
 import csv
-import math
 import httpx
 import random
 from datetime import datetime, timedelta
@@ -23,23 +21,23 @@ class DailyWorkloadGenerator:
         self.base_url = base_url
         self.experiment_duration = 3 * 60  # 3 minutes (compressed 24-hour day)
         self.start_time = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
-        
+
     def get_workload_factor(self, current_time):
         """Calculate workload factor based on time of day (0.0 to 1.0) for 24-hour cycle"""
         hour = current_time.hour
         minute = current_time.minute
         time_in_minutes = hour * 60 + minute
-        
+
         # 0:00-6:00: Very low traffic (night)
         if 0 <= time_in_minutes < 6*60:
             factor = 0.05
-            
+
         # 6:00-9:00: Gradual ramp-up (early morning)
         elif 6*60 <= time_in_minutes < 9*60:
             # Linear increase from 0.05 to 0.6
             progress = (time_in_minutes - 6*60) / (3*60)
             factor = 0.05 + progress * 0.55
-            
+
         # 9:00-12:00: High traffic (morning rush)
         elif 9*60 <= time_in_minutes < 12*60:
             # Peak at 10:30, gradual increase and decrease
@@ -47,11 +45,11 @@ class DailyWorkloadGenerator:
             distance_from_peak = abs(time_in_minutes - peak_time)
             max_distance = 1.5 * 60  # 1.5 hours from peak
             factor = max(0.3, 1.0 - (distance_from_peak / max_distance) * 0.4)
-            
+
         # 12:00-13:00: Lunch break (low traffic)
         elif 12*60 <= time_in_minutes < 13*60:
             factor = 0.1
-            
+
         # 13:00-17:00: Steady traffic (afternoon work)
         elif 13*60 <= time_in_minutes < 17*60:
             # Slight peak around 14:30, then gradual decrease
@@ -59,21 +57,21 @@ class DailyWorkloadGenerator:
             distance_from_peak = abs(time_in_minutes - peak_time)
             max_distance = 2 * 60  # 2 hours from peak
             factor = max(0.4, 0.8 - (distance_from_peak / max_distance) * 0.3)
-            
+
         # 17:00-19:00: Wind down (decreasing traffic)
         elif 17*60 <= time_in_minutes < 19*60:
             # Linear decrease from 0.4 to 0.1
             progress = (time_in_minutes - 17*60) / (2*60)
             factor = 0.4 - progress * 0.3
-            
+
         # 19:00-22:00: Evening low activity
         elif 19*60 <= time_in_minutes < 22*60:
             factor = 0.1
-            
+
         # 22:00-24:00: Very low traffic (late night)
         else:
             factor = 0.05
-            
+
         return max(0.05, min(1.0, factor))
 
     async def worker(self, client, stop_event, results_queue, worker_id):

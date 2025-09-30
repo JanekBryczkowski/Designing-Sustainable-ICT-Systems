@@ -54,3 +54,21 @@ C2-only (No Tiered Compilation)             972      100.00%    0.30            
 - **Most Energy Efficient**: Baseline (Default JIT) (0.0000 J/request)
 
 ---
+
+## Burst Load Simulation
+
+                  Configuration  Total Requests Success Rate Avg RPS P95 Latency (ms) Total Energy (J) Energy/Request (J) Avg CPU % Avg Memory (MB)
+         Baseline (Default JIT)             224       71.43%    1.39            79.16             0.00             0.0000     688.6           224.6
+        Interpret-only (No JIT)             171       62.57%    1.04          4487.67             0.00             0.0000     684.1           195.9
+C2-only (No Tiered Compilation)             221       71.04%    1.37            95.14             0.00             0.0000     680.8           224.4
+            C1-only (No C2 JIT)             221       70.59%    1.23           131.53             0.00             0.0000     693.9           217.6
+        Lower Compile Threshold             221       71.04%    1.22            87.61             0.00             0.0000     714.7           250.6
+                Fixed Heap Size             224       71.43%    1.39            50.98             0.00             0.0000     754.3           385.1
+
+### Key Findings:
+
+- **Highest Throughput**: Baseline (Default JIT) (1.39 RPS)
+- **Lowest Latency**: Fixed Heap Size (50.98 ms)
+- **Most Energy Efficient**: Baseline (Default JIT) (0.0000 J/request)
+
+---

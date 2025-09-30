@@ -14,14 +14,15 @@ import argparse
 import subprocess
 import time
 import os
-import signal
 import sys
-import json
 from datetime import datetime
 import psutil
 
+PROJECT_DIR = "/Users/jakubpataluch/IdeaProjects/Designing-Sustainable-ICT-Systems/jitlab"
+#PROJECT_DIR = "/Users/janbryczkowski/IdeaProjects/Designing Sustainable ICT Systems/jitlab"
+
 class ExperimentRunner:
-    def __init__(self, project_dir="/Users/janbryczkowski/IdeaProjects/Designing Sustainable ICT Systems/jitlab"):
+    def __init__(self, project_dir=PROJECT_DIR):
         self.project_dir = project_dir
         self.runs_dir = os.path.join(project_dir, "runs")
         self.tools_dir = os.path.join(project_dir, "tools")
@@ -91,6 +92,13 @@ class ExperimentRunner:
                 'duration': 4 * 60,  # 4 minutes (compressed 24-hour cycle)
                 'workers': 9,  # 3 per timezone
                 'description': 'Compares 24-hour workload patterns across timezones'
+            },
+            "experiment4": {
+                'name': 'Burst Workload Simulation',
+                'script': 'experiment4_burstload.py',
+                'duration': 3 * 60,  # 3 minutes
+                'workers': 8,
+                'description': 'Simulates bursty workloads with high CPU and I/O phases'
             }
         }
 
@@ -99,7 +107,7 @@ class ExperimentRunner:
         print("Building Java project...")
         try:
             # Set JAVA_HOME to Java 23
-            java_home = "/Users/janbryczkowski/Library/Java/JavaVirtualMachines/openjdk-23.0.1/Contents/Home"
+            java_home = "/Users/jakubpataluch/Library/Java/JavaVirtualMachines/openjdk-21.0.2/Contents/Home"
             env = os.environ.copy()
             env['JAVA_HOME'] = java_home
             
@@ -127,8 +135,8 @@ class ExperimentRunner:
             print(f"JAR file not found: {jar_path}")
             return None
         
-        # Use Java 23 explicitly
-        java_home = "/Users/janbryczkowski/Library/Java/JavaVirtualMachines/openjdk-23.0.1/Contents/Home"
+        # Use Java 21+ explicitly
+        java_home = "/Users/jakubpataluch/Library/Java/JavaVirtualMachines/openjdk-21.0.2/Contents/Home"
         java_executable = os.path.join(java_home, "bin", "java")
         
         # Build command
@@ -244,8 +252,8 @@ class ExperimentRunner:
             time.sleep(2)
             
             # Run experiment
-            if experiment_name == 'experiment1':
-                # Experiment 1 uses seconds
+            if experiment_name == 'experiment1' or experiment_name == 'experiment4':
+                # Experiment 1 & 4 use seconds
                 duration_arg = str(experiment_config['duration'])
             else:
                 # Experiments 2 and 3 use minutes
@@ -377,7 +385,7 @@ def main():
                                'lower_threshold', 'single_compiler', 'heap_sized'],
                        help='Specific JVM configs to test (default: all)')
     parser.add_argument('--project-dir', 
-                       default='/Users/janbryczkowski/IdeaProjects/Designing Sustainable ICT Systems/jitlab',
+                       default=PROJECT_DIR,
                        help='Project directory path')
     
     args = parser.parse_args()

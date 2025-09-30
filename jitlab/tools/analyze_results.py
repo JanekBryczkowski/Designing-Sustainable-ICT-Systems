@@ -11,8 +11,6 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import os
 import glob
-import json
-from datetime import datetime
 import warnings
 warnings.filterwarnings('ignore')
 
@@ -33,7 +31,8 @@ class ResultsAnalyzer:
         self.experiments = {
             'experiment1': 'Daily Workload Simulation',
             'experiment2': 'Yearly Workload Simulation',
-            'experiment3': 'Global Workload Comparison'
+            'experiment3': 'Global Workload Comparison',
+            'experiment4': 'Burst Load Simulation'
         }
 
     def load_experiment_data(self, experiment_name, jvm_config):
@@ -405,7 +404,7 @@ def main():
     parser = argparse.ArgumentParser(description='Analyze JIT optimization experiment results')
     parser.add_argument('--runs-dir', default='runs', help='Directory containing experiment results')
     parser.add_argument('--experiments', nargs='+', 
-                       choices=['experiment1', 'experiment2', 'experiment3'],
+                       choices=['experiment1', 'experiment2', 'experiment3', 'experiment4'],
                        help='Specific experiments to analyze (default: all)')
     
     args = parser.parse_args()
