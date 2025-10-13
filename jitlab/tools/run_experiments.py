@@ -29,6 +29,7 @@ COUNTRIES_TO_TEST = [
     "Germany",
     "United States (Eastern)",
     "Japan",
+    "France",
 ]
 
 class ExperimentRunner:
@@ -380,6 +381,36 @@ class ExperimentRunner:
                     print(f"Generating comprehensive analysis: {' '.join(analysis_cmd)}")
                     subprocess.run(analysis_cmd, cwd=self.project_dir, check=False)
                     print(f"  Analysis plots: {analysis_prefix}_*.png")
+                    
+                    # Generate country-specific system impact analysis
+                    try:
+                        system_impact_cmd = [
+                            'python3', 'tools/experiment3_country_system_impact.py',
+                            '--workload_csv', country_files_arg,
+                            '--monitor_csv', monitor_output,
+                            '--out_prefix', analysis_prefix,
+                            '--output_dir', run_dir
+                        ]
+                        print(f"Generating country-specific system impact analysis: {' '.join(system_impact_cmd)}")
+                        subprocess.run(system_impact_cmd, cwd=self.project_dir, check=False)
+                        print(f"  Country system impact plots: {analysis_prefix}_system_during_*.png")
+                    except Exception as e:
+                        print(f"  Warning: Country system impact analysis failed: {e}")
+                    
+                    # Generate country-specific performance analysis
+                    try:
+                        performance_cmd = [
+                            'python3', 'tools/experiment3_country_performance_analysis.py',
+                            '--workload_csv', country_files_arg,
+                            '--out_prefix', analysis_prefix,
+                            '--output_dir', run_dir
+                        ]
+                        print(f"Generating country-specific performance analysis: {' '.join(performance_cmd)}")
+                        subprocess.run(performance_cmd, cwd=self.project_dir, check=False)
+                        print(f"  Country performance plots: {analysis_prefix}_performance_analysis_*.png")
+                    except Exception as e:
+                        print(f"  Warning: Country performance analysis failed: {e}")
+                        
                 except Exception as e:
                     print(f"Failed to generate analysis: {e}")
 
