@@ -1,0 +1,4 @@
+timestamp,worker_id,country,workload_factor,latency_ms,status_code,endpoint,hour_local,minute_local
+1760382734.937408,0,Japan,1.000,133.897,200,files,9,0
+1760382735.283126,2,Japan,1.000,479.310,200,cpu,9,0
+1760382735.283436,1,Japan,1.000,479.762,200,cpu,9,0

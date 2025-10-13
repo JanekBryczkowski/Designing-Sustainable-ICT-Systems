@@ -1,0 +1,4 @@
+timestamp,worker_id,country,workload_factor,latency_ms,status_code,endpoint,hour_local,minute_local
+1760382519.460984,2,United States (Eastern),0.120,127.498,200,files,20,0
+1760382519.4619908,0,United States (Eastern),0.120,128.892,200,files,20,0
+1760382519.462593,1,United States (Eastern),0.120,129.299,200,files,20,0

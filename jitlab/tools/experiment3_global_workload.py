@@ -12,148 +12,100 @@ import asyncio
 import csv
 import random
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 
 import httpx
 
+# Optional plotting of country profiles
+try:
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+except Exception:
+    plt = None
+
 
 class GlobalWorkloadGenerator:
-    def __init__(self, base_url="http://localhost:8080"):
+    def __init__(self, base_url="http://localhost:8080", profiles_csv_path="country_workload_30min.csv", countries=None):
         self.base_url = base_url
-        
-        # Timezone patterns based on the provided table
-        self.timezone_patterns = {
-            'europe': {
-                'name': 'Europe (NL/DE/FR)',
-                'start_day': 9.0,      # 09:00
-                'morning_peak': (9.5, 12.0),  # 09:30-12:00
-                'lunch_start': 12.0,   # 12:00
-                'lunch_end': 13.0,     # 13:00 (1h lunch)
-                'afternoon': (13.0, 15.5),    # 13:00-15:30
-                'wind_down': (15.5, 17.0),    # 15:30-17:00
-                'evening': None,       # Rare overtime
-                'timezone_offset': 0   # UTC+1 (CET)
-            },
-            'us': {
-                'name': 'US (East/West Coast)',
-                'start_day': 8.5,      # 08:30
-                'morning_peak': (9.0, 12.0),  # 09:00-12:00
-                'lunch_start': 12.0,   # 12:00
-                'lunch_end': 12.75,    # 12:45 (45m lunch)
-                'afternoon': (13.0, 15.5),    # 13:00-15:30
-                'wind_down': (15.5, 17.5),    # 15:30-17:30
-                'evening': (17.5, 19.0),      # Sometimes emails, late calls
-                'timezone_offset': -8  # UTC-8 (PST) or UTC-5 (EST)
-            },
-            'asia': {
-                'name': 'Hong Kong/Asia',
-                'start_day': 9.5,      # 09:30
-                'morning_peak': (10.0, 13.0), # 10:00-13:00
-                'lunch_start': 13.0,   # 13:00
-                'lunch_end': 14.0,     # 14:00 (1h lunch, often later)
-                'afternoon': (14.0, 17.0),    # 14:00-17:00
-                'evening_peak': (17.0, 19.0), # 17:00-19:00
-                'late_evening': (19.0, 20.0), # Often until 20:00+
-                'timezone_offset': 8   # UTC+8 (HKT)
-            }
+        self.profiles_csv_path = profiles_csv_path
+        self.country_profiles = self._load_country_profiles(self.profiles_csv_path)
+        self.countries = countries or list(self.country_profiles.keys())
+
+        # Minimal country -> primary timezone mapping for provided sample countries
+        # Extend this map as you add countries to the CSV
+        self.country_timezones = {
+            "Germany": "Europe/Berlin",
+            "France": "Europe/Paris",
+            "Netherlands": "Europe/Amsterdam",
+            "United Kingdom": "Europe/London",
+            "United States (Eastern)": "America/New_York",
+            "United States (Pacific)": "America/Los_Angeles",
+            "Japan": "Asia/Tokyo",
+            "South Korea": "Asia/Seoul",
+            "China": "Asia/Shanghai",
+            "India": "Asia/Kolkata",
+            "Hong Kong": "Asia/Hong_Kong",
         }
 
-    def get_workload_factor(self, current_time, timezone):
-        """Calculate workload factor based on timezone and time of day"""
-        hour = current_time.hour
-        minute = current_time.minute
-        time_in_hours = hour + minute / 60.0
-        
-        pattern = self.timezone_patterns[timezone]
-        
-        # Adjust for timezone offset (simplified - just shift the time)
-        adjusted_time = time_in_hours + pattern['timezone_offset']
-        if adjusted_time < 0:
-            adjusted_time += 24
-        elif adjusted_time >= 24:
-            adjusted_time -= 24
-            
-        # Calculate workload based on timezone pattern
-        if timezone == 'europe':
-            return self._get_europe_workload(adjusted_time)
-        elif timezone == 'us':
-            return self._get_us_workload(adjusted_time)
-        elif timezone == 'asia':
-            return self._get_asia_workload(adjusted_time)
-        else:
+        # Fallback if a country timezone is missing
+        for c in self.countries:
+            if c not in self.country_timezones:
+                self.country_timezones[c] = "UTC"
+
+    def _load_country_profiles(self, csv_path):
+        profiles = {}
+        with open(csv_path, "r") as f:
+            reader = csv.reader(f)
+            header = next(reader)
+            # Expect 49 columns: country + 48 half-hour bins
+            for row in reader:
+                if not row:
+                    continue
+                country = row[0].strip()
+                try:
+                    values = [float(x) for x in row[1:49]]
+                except Exception:
+                    continue
+                if len(values) == 48:
+                    profiles[country] = values
+        return profiles
+
+    def get_country_workload_factor(self, hour, minute, country):
+        idx = hour * 2 + (1 if minute >= 30 else 0)
+        idx = max(0, min(47, idx))
+        values = self.country_profiles.get(country)
+        if not values:
             return 0.1
+        result = max(0.01, values[idx])
+        return result
 
-    def _get_europe_workload(self, time_hours):
-        """Europe workload pattern"""
-        if 9.0 <= time_hours < 9.5:  # 09:00-09:30 medium ramp-up
-            return 0.6
-        elif 9.5 <= time_hours < 12.0:  # 09:30-12:00 high focus
-            return 1.0
-        elif 12.0 <= time_hours < 13.0:  # 12:00-13:00 long lunch
-            return 0.1
-        elif 13.0 <= time_hours < 15.5:  # 13:00-15:30 medium
-            return 0.7
-        elif 15.5 <= time_hours < 17.0:  # 15:30-17:00 low, winding down
-            return 0.4
-        else:  # Evening - rare overtime
-            return 0.05
-
-    def _get_us_workload(self, time_hours):
-        """US workload pattern"""
-        if 8.5 <= time_hours < 9.0:  # 08:30-09:00 high focus start
-            return 0.8
-        elif 9.0 <= time_hours < 12.0:  # 09:00-12:00 high focus
-            return 1.0
-        elif 12.0 <= time_hours < 12.75:  # 12:00-12:45 short lunch
-            return 0.2
-        elif 13.0 <= time_hours < 15.5:  # 13:00-15:30 medium-high
-            return 0.8
-        elif 15.5 <= time_hours < 17.5:  # 15:30-17:30 medium
-            return 0.6
-        elif 17.5 <= time_hours < 19.0:  # 17:30-19:00 sometimes emails, late calls
-            return 0.3
-        else:
-            return 0.05
-
-    def _get_asia_workload(self, time_hours):
-        """Asia workload pattern"""
-        if 9.5 <= time_hours < 10.0:  # 09:30-10:00 high focus start
-            return 0.8
-        elif 10.0 <= time_hours < 13.0:  # 10:00-13:00 high focus
-            return 1.0
-        elif 13.0 <= time_hours < 14.0:  # 13:00-14:00 medium lunch
-            return 0.3
-        elif 14.0 <= time_hours < 17.0:  # 14:00-17:00 high
-            return 0.9
-        elif 17.0 <= time_hours < 19.0:  # 17:00-19:00 high
-            return 1.0
-        elif 19.0 <= time_hours < 20.0:  # 19:00-20:00 heavy workload
-            return 0.8
-        elif 20.0 <= time_hours < 22.0:  # 20:00+ common overtime
-            return 0.6
-        else:
-            return 0.05
-
-    async def worker(self, client, stop_event, results_queue, worker_id, timezone):
-        """Worker that generates requests based on timezone workload"""
+    async def worker(self, client, stop_event, results_queue, worker_id, country, duration_seconds):
+        """Worker that generates requests based on per-country workload profile"""
         request_count = 0
+        # Calculate delay: experiment duration in seconds divided by 48 (half-hour bins)
+        base_delay = duration_seconds / 48
+        
         while not stop_event.is_set():
-            current_time = datetime.now()
-            workload_factor = self.get_workload_factor(current_time, timezone)
-            
-            # Adjust request frequency based on workload
-            base_delay = 1.5
-            actual_delay = base_delay / workload_factor if workload_factor > 0 else base_delay * 5
-            
-            # Add randomness
-            actual_delay *= (0.8 + 0.4 * random.random())
-            
+            # Calculate simulated time based on request count
+            # Each request represents one half-hour bin in the 24-hour cycle
+            # Simple approach: request_count 0 = 00:00, request_count 1 = 00:30, etc.
+            simulated_hour = (request_count * 30) // 60
+            simulated_minute = (request_count * 30) % 60
+            workload_factor = self.get_country_workload_factor(simulated_hour, simulated_minute, country)
+
             try:
-                await asyncio.sleep(actual_delay)
-                
+                # Wait for the calculated delay
+                try:
+                    await asyncio.wait_for(asyncio.sleep(base_delay), timeout=base_delay + 1.0)
+                except asyncio.TimeoutError:
+                    break
+
                 if stop_event.is_set():
                     break
-                    
+                
+
                 # Choose endpoint based on workload (both endpoints used with different frequency)
                 if workload_factor > 0.8:  # High load: 75% CPU, 25% files
                     if random.random() < 0.75:
@@ -167,7 +119,7 @@ class GlobalWorkloadGenerator:
                         body = {
                             "fileCount": min(500, int(8 * workload_factor)),  # Cap at 500 files
                             "fileSizeBytes": min(10000000, int(100000 * workload_factor)),  # Cap at 10MB
-                            "prefix": f"{timezone}_{worker_id}"
+                            "prefix": f"{country}_{worker_id}"
                         }
                 elif workload_factor > 0.5:  # Medium load: 50% CPU, 50% files
                     if random.random() < 0.5:
@@ -181,7 +133,7 @@ class GlobalWorkloadGenerator:
                         body = {
                             "fileCount": min(500, int(12 * workload_factor)),  # Cap at 500 files
                             "fileSizeBytes": min(10000000, int(150000 * workload_factor)),  # Cap at 10MB
-                            "prefix": f"{timezone}_{worker_id}"
+                            "prefix": f"{country}_{worker_id}"
                         }
                 else:  # Low load: 15% CPU, 85% files
                     if random.random() < 0.15:
@@ -195,130 +147,223 @@ class GlobalWorkloadGenerator:
                         body = {
                             "fileCount": max(1, min(500, int(4 * workload_factor))),  # Cap at 500 files
                             "fileSizeBytes": min(10000000, int(80000 * workload_factor)),  # Cap at 10MB
-                            "prefix": f"{timezone}_{worker_id}"
+                            "prefix": f"{country}_{worker_id}"
                         }
-                
+
                 # Make request
-                start_time = time.perf_counter()
+                request_start_time = time.perf_counter()
                 try:
                     response = await client.post(url, json=body, timeout=30.0)
                     await response.aread()
                     status_code = response.status_code
                 except Exception as e:
                     status_code = -1
-                
+
                 end_time = time.perf_counter()
-                latency_ms = (end_time - start_time) * 1000.0
-                
+                latency_ms = (end_time - request_start_time) * 1000.0
+
+
                 # Record result
-                await results_queue.put({
+                result = {
                     'timestamp': time.time(),
                     'worker_id': worker_id,
-                    'timezone': timezone,
+                    'country': country,
                     'workload_factor': workload_factor,
                     'latency_ms': latency_ms,
                     'status_code': status_code,
                     'endpoint': 'cpu' if 'cpu' in url else 'files',
-                    'hour': current_time.hour
-                })
-                
+                    'hour_local': simulated_hour,
+                    'minute_local': simulated_minute
+                }
+                await results_queue.put(result)
+
                 # Print progress every 10 requests
                 request_count += 1
                 if request_count % 10 == 0:
-                    print(f"Worker {worker_id} ({timezone}): {request_count} requests, workload={workload_factor:.2f}, latency={latency_ms:.1f}ms")
+                    print(f"Worker {worker_id} ({country}): {request_count} requests, workload={workload_factor:.2f}, latency={latency_ms:.1f}ms")
                 
+
             except asyncio.CancelledError:
                 break
             except Exception as e:
-                print(f"Worker {worker_id} ({timezone}) error: {e}")
+                import traceback
+                print(f"Worker {worker_id} ({country}) error: {e}")
+        
 
-    async def run_experiment(self, workers_per_timezone=3, output_file="experiment3_global_workload.csv", duration_minutes=4):
+    async def run_experiment(self, workers_per_country=3, output_file="experiment3_global_workload.csv", duration_seconds=240, separate_files=False):
         """Run the global workload experiment"""
         print(f"Starting Experiment 3: Global Workload Comparison")
-        print(f"Duration: {duration_minutes} minutes (compressed 24-hour cycle), Workers per timezone: {workers_per_timezone}")
-        print(f"Output: {output_file}")
+        print(f"Duration: {duration_seconds} seconds (compressed 24-hour cycle), Workers per country: {workers_per_country}")
         
+        if separate_files:
+            # Create separate output files for each country
+            output_files = {}
+            for country in self.countries:
+                clean_country = country.replace(' ', '_').replace('(', '').replace(')', '').replace(',', '')
+                output_files[country] = f"{output_file}_{clean_country}.csv"
+            print(f"Output files: {list(output_files.values())}")
+        else:
+            print(f"Output: {output_file}")
+            output_files = {country: output_file for country in self.countries}
+
         results_queue = asyncio.Queue()
         stop_event = asyncio.Event()
-        
+
         # Start monitoring
-        monitor_task = asyncio.create_task(self.monitor_results(results_queue, output_file))
-        
-        # Start workers for each timezone
+        monitor_task = asyncio.create_task(self.monitor_results(results_queue, output_files, separate_files))
+
+        # Start workers for each selected country
         async with httpx.AsyncClient(http2=False, timeout=30.0) as client:
             worker_tasks = []
-            
-            for timezone in ['europe', 'us', 'asia']:
-                for i in range(workers_per_timezone):
+
+            for country in self.countries:
+                for i in range(workers_per_country):
                     task = asyncio.create_task(
-                        self.worker(client, stop_event, results_queue, i, timezone)
+                        self.worker(client, stop_event, results_queue, i, country, duration_seconds)
                     )
                     worker_tasks.append(task)
-            
+
             # Run for specified duration (compressed 24-hour cycle)
-            print(f"Running experiment for {duration_minutes} minutes (compressed 24-hour cycle)...")
+            print(f"Running experiment for {duration_seconds} seconds (compressed 24-hour cycle)...")
             print("Workers are generating requests...")
-            
-            # Show progress every 30 seconds
+
+            # Show progress every 10 seconds (or duration if shorter)
             start_time = time.time()
-            while time.time() - start_time < duration_minutes * 60:
-                await asyncio.sleep(30)
+            progress_interval = min(10, duration_seconds)
+            while time.time() - start_time < duration_seconds:
+                await asyncio.sleep(progress_interval)
                 elapsed = int(time.time() - start_time)
-                remaining = duration_minutes * 60 - elapsed
+                remaining = duration_seconds - elapsed
                 print(f"Progress: {elapsed}s elapsed, {remaining}s remaining")
-            
+
             # Stop workers
             print("Stopping workers...")
             stop_event.set()
             await asyncio.gather(*worker_tasks, return_exceptions=True)
-            
+
             # Stop monitoring
             monitor_task.cancel()
             try:
                 await monitor_task
             except asyncio.CancelledError:
                 pass
-        
-        print(f"Experiment 3 completed. Results saved to {output_file}")
 
-    async def monitor_results(self, results_queue, output_file):
+        if separate_files:
+            print(f"Experiment 3 completed. Results saved to separate files:")
+            for country, output_file in output_files.items():
+                print(f"  {country}: {output_file}")
+        else:
+            print(f"Experiment 3 completed. Results saved to {output_file}")
+
+    async def monitor_results(self, results_queue, output_files, separate_files=False):
         """Monitor and save results to CSV"""
-        with open(output_file, 'w', newline='') as f:
+        if separate_files:
+            # Open separate files for each country
+            file_handles = {}
+            writers = {}
+            for country, output_file in output_files.items():
+                f = open(output_file, 'w', newline='')
+                writer = csv.writer(f)
+                writer.writerow(['timestamp', 'worker_id', 'country', 'workload_factor', 'latency_ms', 'status_code', 'endpoint', 'hour_local', 'minute_local'])
+                file_handles[country] = f
+                writers[country] = writer
+        else:
+            # Use single file (backward compatibility)
+            output_file = list(output_files.values())[0]
+            f = open(output_file, 'w', newline='')
             writer = csv.writer(f)
-            writer.writerow(['timestamp', 'worker_id', 'timezone', 'workload_factor', 'latency_ms', 'status_code', 'endpoint', 'hour'])
-            
+            writer.writerow(['timestamp', 'worker_id', 'country', 'workload_factor', 'latency_ms', 'status_code', 'endpoint', 'hour_local', 'minute_local'])
+            file_handles = {'all': f}
+            writers = {'all': writer}
+
+        try:
             while True:
                 try:
                     result = await asyncio.wait_for(results_queue.get(), timeout=1.0)
-                    writer.writerow([
-                        result['timestamp'],
-                        result['worker_id'],
-                        result['timezone'],
-                        f"{result['workload_factor']:.3f}",
-                        f"{result['latency_ms']:.3f}",
-                        result['status_code'],
-                        result['endpoint'],
-                        result['hour']
-                    ])
-                    f.flush()
+                    
+                    if separate_files:
+                        # Write to country-specific file
+                        country = result['country']
+                        if country in writers:
+                            writers[country].writerow([
+                                result['timestamp'],
+                                result['worker_id'],
+                                result['country'],
+                                f"{result['workload_factor']:.3f}",
+                                f"{result['latency_ms']:.3f}",
+                                result['status_code'],
+                                result['endpoint'],
+                                result['hour_local'],
+                                result['minute_local']
+                            ])
+                            file_handles[country].flush()
+                    else:
+                        # Write to single file
+                        writers['all'].writerow([
+                            result['timestamp'],
+                            result['worker_id'],
+                            result['country'],
+                            f"{result['workload_factor']:.3f}",
+                            f"{result['latency_ms']:.3f}",
+                            result['status_code'],
+                            result['endpoint'],
+                            result['hour_local'],
+                            result['minute_local']
+                        ])
+                        file_handles['all'].flush()
+                        
                 except asyncio.TimeoutError:
                     continue
                 except Exception as e:
                     print(f"Monitor error: {e}")
                     break
+        finally:
+            # Close all file handles
+            for f in file_handles.values():
+                f.close()
+
+    def plot_country_profiles(self, out_png="experiment3_country_profiles.png"):
+        if plt is None:
+            print("matplotlib not available; skipping profile plot")
+            return
+        x = [f"{h:02d}:{m:02d}" for h in range(24) for m in (0,30)]
+        for c in self.countries:
+            values = self.country_profiles.get(c)
+            if values:
+                plt.plot(range(48), values, label=c)
+        plt.xticks(ticks=list(range(0,48,2)), labels=[x[i] for i in range(0,48,2)], rotation=45, ha='right')
+        plt.xlabel("Local Time (30-min bins)")
+        plt.ylabel("Workload factor (relative)")
+        plt.title("Per-country workload profiles")
+        plt.legend()
+        plt.tight_layout()
+        plt.savefig(out_png)
+        plt.close()
+        print(f"Saved {out_png}")
+
 
 async def main():
     parser = argparse.ArgumentParser(description='Experiment 3: Global Workload Comparison')
     parser.add_argument('--url', default='http://localhost:8080', help='Server URL')
-    parser.add_argument('--workers', type=int, default=3, help='Number of workers per timezone')
+    parser.add_argument('--workers', type=int, default=3, help='Number of workers per country')
     parser.add_argument('--output', default='experiment3_global_workload.csv', help='Output CSV file')
-    parser.add_argument('--duration', type=int, default=4, help='Experiment duration in minutes')
-    
+    parser.add_argument('--duration', type=int, default=240, help='Experiment duration in seconds')
+    parser.add_argument('--profiles', default='country_workload_30min.csv', help='CSV with 48-bin per-country profiles')
+    parser.add_argument('--countries', default='', help='Comma-separated list of countries to include')
+    parser.add_argument('--plot-profiles', action='store_true', help='Plot per-country profiles and exit')
+    parser.add_argument('--separate-files', action='store_true', help='Create separate output files for each country')
+
     args = parser.parse_args()
-    
-    generator = GlobalWorkloadGenerator(args.url)
-    
-    await generator.run_experiment(args.workers, args.output, args.duration)
+
+    countries = [c.strip() for c in args.countries.split(',') if c.strip()] if args.countries else None
+    generator = GlobalWorkloadGenerator(args.url, args.profiles, countries)
+
+    if args.plot_profiles:
+        generator.plot_country_profiles()
+        return
+
+    await generator.run_experiment(args.workers, args.output, args.duration, args.separate_files)
+
 
 if __name__ == "__main__":
     asyncio.run(main())

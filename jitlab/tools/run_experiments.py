@@ -17,9 +17,19 @@ import os
 import sys
 from datetime import datetime
 import psutil
+import re
 
-PROJECT_DIR = "/Users/jakubpataluch/IdeaProjects/Designing-Sustainable-ICT-Systems/jitlab"
-#PROJECT_DIR = "/Users/janbryczkowski/IdeaProjects/Designing Sustainable ICT Systems/jitlab"
+# PROJECT_DIR = "/Users/jakubpataluch/IdeaProjects/Designing-Sustainable-ICT-Systems/jitlab"
+# JAVA_HOME = "/Users/jakubpataluch/Library/Java/JavaVirtualMachines/openjdk-21.0.2/Contents/Home"
+PROJECT_DIR = "/Users/janbryczkowski/IdeaProjects/Designing Sustainable ICT Systems/jitlab"
+JAVA_HOME = "/Users/janbryczkowski/Library/Java/JavaVirtualMachines/openjdk-23.0.1/Contents/Home"
+
+# Countries to investigate in Experiment 3
+COUNTRIES_TO_TEST = [
+    "Germany",
+    "United States (Eastern)",
+    "Japan",
+]
 
 class ExperimentRunner:
     def __init__(self, project_dir=PROJECT_DIR):
@@ -37,68 +47,47 @@ class ExperimentRunner:
                 'name': 'Baseline (Default JIT)',
                 'flags': [],
                 'description': 'Standard JVM with default JIT compilation'
-            },
-            'interpret_only': {
-                'name': 'Interpret-only (No JIT)',
-                'flags': ['-Xint'],
-                'description': 'No JIT compilation, pure interpretation'
-            },
-            'c2_only': {
-                'name': 'C2-only (No Tiered Compilation)',
-                'flags': ['-XX:-TieredCompilation'],
-                'description': 'Skip C1, compile directly to C2'
-            },
-            'c1_only': {
-                'name': 'C1-only (No C2 JIT)',
-                'flags': ['-XX:+TieredCompilation', '-XX:TieredStopAtLevel=1'],
-                'description': 'Stop compilation at C1 level'
-            },
-            'lower_threshold': {
-                'name': 'Lower Compile Threshold',
-                'flags': ['-XX:CompileThreshold=1000'],
-                'description': 'Compile methods sooner (lower threshold)'
-            },
-            'single_compiler': {
-                'name': 'Single Compiler Thread',
-                'flags': ['-XX:CICompilerCount=1'],
-                'description': 'Use only one compiler thread (slower warmup)'
-            },
-            'heap_sized': {
-                'name': 'Fixed Heap Size',
-                'flags': ['-Xms1g', '-Xmx1g'],
-                'description': 'Fixed heap size to stabilize GC effects'
             }
+            # 'interpret_only': {
+            #     'name': 'Interpret-only (No JIT)',
+            #     'flags': ['-Xint'],
+            #     'description': 'No JIT compilation, pure interpretation'
+            # },
+            # 'c2_only': {
+            #     'name': 'C2-only (No Tiered Compilation)',
+            #     'flags': ['-XX:-TieredCompilation'],
+            #     'description': 'Skip C1, compile directly to C2'
+            # },
+            # 'c1_only': {
+            #     'name': 'C1-only (No C2 JIT)',
+            #     'flags': ['-XX:+TieredCompilation', '-XX:TieredStopAtLevel=1'],
+            #     'description': 'Stop compilation at C1 level'
+            # },
+            # 'lower_threshold': {
+            #     'name': 'Lower Compile Threshold',
+            #     'flags': ['-XX:CompileThreshold=1000'],
+            #     'description': 'Compile methods sooner (lower threshold)'
+            # },
+            # 'single_compiler': {
+            #     'name': 'Single Compiler Thread',
+            #     'flags': ['-XX:CICompilerCount=1'],
+            #     'description': 'Use only one compiler thread (slower warmup)'
+            # },
+            # 'heap_sized': {
+            #     'name': 'Fixed Heap Size',
+            #     'flags': ['-Xms1g', '-Xmx1g'],
+            #     'description': 'Fixed heap size to stabilize GC effects'
+            # }
         }
         
         # Experiment configurations
         self.experiments = {
-            'experiment1': {
-                'name': 'Daily Workload Simulation',
-                'script': 'experiment1_daily_workload.py',
-                'duration': 3 * 60,  # 3 minutes (compressed 24-hour day)
-                'workers': 8,
-                'description': 'Simulates typical 24-hour day patterns'
-            },
-            'experiment2': {
-                'name': 'Yearly Workload Simulation',
-                'script': 'experiment2_yearly_workload.py',
-                'duration': 3 * 60,  # 3 minutes (compressed year)
-                'workers': 6,
-                'description': 'Simulates seasonal patterns and major events'
-            },
             'experiment3': {
                 'name': 'Global Workload Comparison',
                 'script': 'experiment3_global_workload.py',
-                'duration': 4 * 60,  # 4 minutes (compressed 24-hour cycle)
-                'workers': 9,  # 3 per timezone
-                'description': 'Compares 24-hour workload patterns across timezones'
-            },
-            "experiment4": {
-                'name': 'Burst Workload Simulation',
-                'script': 'experiment4_burstload.py',
-                'duration': 3 * 60,  # 3 minutes
-                'workers': 8,
-                'description': 'Simulates bursty workloads with high CPU and I/O phases'
+                'duration': 48,  # 48 seconds
+                'workers': 3,  # per country
+                'description': 'Compares 24-hour workload patterns across countries'
             }
         }
 
@@ -107,7 +96,7 @@ class ExperimentRunner:
         print("Building Java project...")
         try:
             # Set JAVA_HOME to Java 23
-            java_home = "/Users/jakubpataluch/Library/Java/JavaVirtualMachines/openjdk-21.0.2/Contents/Home"
+            java_home = JAVA_HOME
             env = os.environ.copy()
             env['JAVA_HOME'] = java_home
             
@@ -136,7 +125,7 @@ class ExperimentRunner:
             return None
         
         # Use Java 21+ explicitly
-        java_home = "/Users/jakubpataluch/Library/Java/JavaVirtualMachines/openjdk-21.0.2/Contents/Home"
+        java_home = JAVA_HOME
         java_executable = os.path.join(java_home, "bin", "java")
         
         # Build command
@@ -235,9 +224,31 @@ class ExperimentRunner:
         # Generate output filenames
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         base_name = f"{experiment_name}_{jvm_config_name}_{timestamp}"
+
+        # Create dated run directory: e.g., 13-oct-2025-run-1
+        today_str = datetime.now().strftime("%d-%b-%Y").lower()
+        pattern = re.compile(rf"^{re.escape(today_str)}-run-(\d+)$")
+        existing = [d for d in os.listdir(self.runs_dir) if os.path.isdir(os.path.join(self.runs_dir, d))]
+        nums = []
+        for d in existing:
+            m = pattern.match(d)
+            if m:
+                try:
+                    nums.append(int(m.group(1)))
+                except ValueError:
+                    pass
+        next_num = max(nums) + 1 if nums else 1
+        run_dir = os.path.join(self.runs_dir, f"{today_str}-run-{next_num}")
+        os.makedirs(run_dir, exist_ok=True)
+
+        # Create separate output files for each country
+        workload_outputs = {}
+        for country in COUNTRIES_TO_TEST:
+            # Clean country name for filename (remove special characters)
+            clean_country = country.replace(' ', '_').replace('(', '').replace(')', '').replace(',', '')
+            workload_outputs[country] = os.path.join(run_dir, f"{base_name}_workload_{clean_country}.csv")
         
-        workload_output = os.path.join(self.runs_dir, f"{base_name}_workload.csv")
-        monitor_output = os.path.join(self.runs_dir, f"{base_name}_monitor.csv")
+        monitor_output = os.path.join(run_dir, f"{base_name}_monitor.csv")
         
         # Start server
         server_process = self.start_server(jvm_config_name, jvm_config)
@@ -252,19 +263,21 @@ class ExperimentRunner:
             time.sleep(2)
             
             # Run experiment
-            if experiment_name == 'experiment1' or experiment_name == 'experiment4':
-                # Experiment 1 & 4 use seconds
-                duration_arg = str(experiment_config['duration'])
-            else:
-                # Experiments 2 and 3 use minutes
-                duration_arg = str(experiment_config['duration'] // 60)
+            # Pass duration in seconds (not minutes)
+            duration_arg = str(experiment_config['duration'])
+            
+            # Pass base output path and let the script create separate files per country
+            base_output_path = os.path.join(run_dir, f"{base_name}_workload")
             
             experiment_cmd = [
                 'python3', f'tools/{experiment_config["script"]}',
                 '--url', 'http://localhost:8080',
                 '--workers', str(experiment_config['workers']),
-                '--output', workload_output,
-                '--duration', duration_arg
+                '--output', base_output_path,
+                '--duration', duration_arg,
+                '--countries', ','.join(COUNTRIES_TO_TEST),
+                '--profiles', 'tools/country_workload_30min.csv',
+                '--separate-files'  # Flag to enable separate files per country
             ]
             
             print(f"Running experiment: {' '.join(experiment_cmd)}")
@@ -309,10 +322,67 @@ class ExperimentRunner:
                     monitor_process.kill()
             
             # Check if files were created
-            if os.path.exists(workload_output) and os.path.exists(monitor_output):
+            country_files_exist = all(os.path.exists(workload_outputs[country]) for country in COUNTRIES_TO_TEST)
+            if country_files_exist and os.path.exists(monitor_output):
                 print(f"Results saved:")
-                print(f"  Workload: {workload_output}")
+                for country in COUNTRIES_TO_TEST:
+                    print(f"  {country}: {workload_outputs[country]}")
                 print(f"  Monitor: {monitor_output}")
+
+                # Generate per-country profiles plot
+                try:
+                    profiles_png = os.path.join(run_dir, f"{base_name}_profiles.png")
+                    plot_cmd = [
+                        'python3', 'tools/experiment3_country_plot.py',
+                        '--profiles', 'tools/country_workload_30min.csv',
+                        '--countries', ','.join(COUNTRIES_TO_TEST),
+                        '--out', profiles_png
+                    ]
+                    print(f"Generating profiles plot: {' '.join(plot_cmd)}")
+                    subprocess.run(plot_cmd, cwd=self.project_dir, check=False)
+                    if os.path.exists(profiles_png):
+                        print(f"  Profiles plot: {profiles_png}")
+                    else:
+                        print("  Profiles plot not generated")
+                except Exception as e:
+                    print(f"Failed to generate profiles plot: {e}")
+
+                # Generate one results plot with a line per country
+                try:
+                    results_png = os.path.join(run_dir, f"{base_name}_results.png")
+                    # Pass all country files to the plotting script
+                    country_files_arg = ','.join([workload_outputs[country] for country in COUNTRIES_TO_TEST])
+                    plot_results_cmd = [
+                        'python3', 'tools/experiment3_results_plot.py',
+                        '--workload_csv', country_files_arg,
+                        '--out', results_png
+                    ]
+                    print(f"Generating results plot: {' '.join(plot_results_cmd)}")
+                    subprocess.run(plot_results_cmd, cwd=self.project_dir, check=False)
+                    if os.path.exists(results_png):
+                        print(f"  Results plot: {results_png}")
+                    else:
+                        print("  Results plot not generated")
+                except Exception as e:
+                    print(f"Failed to generate results plot: {e}")
+
+                # Generate comprehensive analysis (throughput, latency, CPU, memory, power)
+                try:
+                    analysis_prefix = os.path.join(run_dir, f"{base_name}_analysis")
+                    # Pass all country files to the analysis script
+                    country_files_arg = ','.join([workload_outputs[country] for country in COUNTRIES_TO_TEST])
+                    analysis_cmd = [
+                        'python3', 'tools/experiment3_analysis.py',
+                        '--workload_csv', country_files_arg,
+                        '--monitor_csv', monitor_output,
+                        '--out_prefix', analysis_prefix
+                    ]
+                    print(f"Generating comprehensive analysis: {' '.join(analysis_cmd)}")
+                    subprocess.run(analysis_cmd, cwd=self.project_dir, check=False)
+                    print(f"  Analysis plots: {analysis_prefix}_*.png")
+                except Exception as e:
+                    print(f"Failed to generate analysis: {e}")
+
                 return True
             else:
                 print("Results files not found")
@@ -325,9 +395,10 @@ class ExperimentRunner:
         return False
 
     def run_all_experiments(self, selected_experiments=None, selected_configs=None):
-        """Run all experiments with all JVM configurations"""
+        """Run selected experiments with selected JVM configurations"""
+        # Default: run only experiment3
         if selected_experiments is None:
-            selected_experiments = list(self.experiments.keys())
+            selected_experiments = ['experiment3']
         
         if selected_configs is None:
             selected_configs = list(self.jvm_configs.keys())
@@ -370,7 +441,7 @@ class ExperimentRunner:
         for experiment_name, experiment_results in results.items():
             print(f"\n{self.experiments[experiment_name]['name']}:")
             for jvm_config_name, success in experiment_results.items():
-                status = "✓" if success else "✗"
+                status = "\u2713" if success else "\u2717"
                 print(f"  {status} {self.jvm_configs[jvm_config_name]['name']}")
         
         return results
@@ -378,8 +449,8 @@ class ExperimentRunner:
 def main():
     parser = argparse.ArgumentParser(description='Run JIT optimization experiments')
     parser.add_argument('--experiments', nargs='+', 
-                       choices=['experiment1', 'experiment2', 'experiment3'],
-                       help='Specific experiments to run (default: all)')
+                       choices=['experiment3'],
+                       help='Specific experiments to run (default: experiment3)')
     parser.add_argument('--configs', nargs='+',
                        choices=['baseline', 'interpret_only', 'c2_only', 'c1_only', 
                                'lower_threshold', 'single_compiler', 'heap_sized'],
