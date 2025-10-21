@@ -10,6 +10,7 @@ Simulates workload patterns across different time zones:
 import argparse
 import asyncio
 import csv
+import math
 import random
 import time
 from datetime import datetime, timedelta
@@ -53,6 +54,81 @@ class GlobalWorkloadGenerator:
         for c in self.countries:
             if c not in self.country_timezones:
                 self.country_timezones[c] = "UTC"
+
+    def _sigmoid(self, x, k=10.0, x0=0.5):
+        return 1.0 / (1.0 + math.exp(-k * (x - x0)))
+
+    def estimate_request_emissions(self, latency_ms, server_power_w=200.0, pue=1.2, grid_g_co2_per_kwh=400.0):
+        """
+        Estimate CO2 emissions (kg CO2eq) for a single request:
+          - latency_ms: measured request time (client->server->server done -> response received)
+          - server_power_w: approximate server average power draw while handling the request (W)
+          - pue: data center PUE (total facility_energy / it_equipment_energy)
+          - grid_g_co2_per_kwh: grid carbon intensity (gCO2eq per kWh)
+
+        Formula:
+          energy_kwh = (latency_s * server_power_w) / 3600  # kWh used by server
+          total_energy_kwh = energy_kwh * pue
+          emissions_kg = total_energy_kwh * (grid_g_co2_per_kwh / 1000.0)
+        Returns emissions in kilograms of CO2-equivalent.
+        """
+        latency_s = max(0.0, latency_ms / 1000.0)
+        energy_kwh = (latency_s * server_power_w) / 3600.0
+        total_energy_kwh = energy_kwh * pue
+        emissions_kg = total_energy_kwh * (grid_g_co2_per_kwh / 1000.0)
+        return emissions_kg
+
+    def select_endpoint_and_body(self, workload_factor, country, worker_id,
+                                 cpu_bias=0.0, sigmoid_k=8.0):
+        """
+        Convert workload_factor (0..1) into:
+         - endpoint ('cpu' or 'files')
+         - request body dict
+
+        Behavior:
+         - probability of choosing CPU ramps smoothly with workload_factor via a sigmoid
+         - body parameters are continuous functions of workload_factor
+         - cpu_bias allows global preference for CPU (positive -> more CPU)
+        """
+        # Clamp
+        wf = max(0.0, min(1.0, float(workload_factor)))
+
+        # Map workload factor to CPU probability via sigmoid
+        p_cpu = self._sigmoid(wf + cpu_bias, k=sigmoid_k, x0=0.5)
+        # keep probability in [0.05, 0.95] to avoid extremes unless intentionally set
+        p_cpu = max(0.05, min(0.95, p_cpu))
+
+        # Sample endpoint
+        if random.random() < p_cpu:
+            endpoint = "cpu"
+            # continuous scaling for CPU params
+            # iterations: base ~ 2000 .. 50000000 (capped)
+            iterations = int(2000 + (12000 - 2000) * wf)  # you can adjust the base/scale
+            iterations = min(50000000, int(iterations * (1 + 0.5 * wf)))  # optional amplification
+            payload_size = int(2000 + (60000 - 2000) * wf)  # bytes, capped below
+            payload_size = min(1000000, payload_size)
+            body = {
+                "iterations": iterations,
+                "payloadSize": payload_size
+            }
+            url = f"{self.base_url}/work/cpu"
+        else:
+            endpoint = "files"
+            # continuous scaling for file params
+            # fileCount: 1 .. 500
+            file_count = max(1, int(1 + (100 - 1) * wf * 1.5))  # bias to more files as wf rises
+            file_count = min(500, file_count)
+            # fileSizeBytes: 1024 .. 10MB
+            file_size = int(1024 + (150000 - 1024) * wf)
+            file_size = min(10_000_000, file_size)
+            body = {
+                "fileCount": file_count,
+                "fileSizeBytes": file_size,
+                "prefix": f"{country}_{worker_id}"
+            }
+            url = f"{self.base_url}/work/files"
+
+        return url, body, endpoint, p_cpu
 
     def _load_country_profiles(self, csv_path):
         profiles = {}
@@ -107,48 +183,7 @@ class GlobalWorkloadGenerator:
                 
 
                 # Choose endpoint based on workload (both endpoints used with different frequency)
-                if workload_factor > 0.8:  # High load: 75% CPU, 25% files
-                    if random.random() < 0.75:
-                        url = f"{self.base_url}/work/cpu"
-                        body = {
-                            "iterations": min(50000000, int(12000 * workload_factor)),  # Cap at 50M
-                            "payloadSize": min(1000000, int(60000 * workload_factor))  # Cap at 1M
-                        }
-                    else:
-                        url = f"{self.base_url}/work/files"
-                        body = {
-                            "fileCount": min(500, int(8 * workload_factor)),  # Cap at 500 files
-                            "fileSizeBytes": min(10000000, int(100000 * workload_factor)),  # Cap at 10MB
-                            "prefix": f"{country}_{worker_id}"
-                        }
-                elif workload_factor > 0.5:  # Medium load: 50% CPU, 50% files
-                    if random.random() < 0.5:
-                        url = f"{self.base_url}/work/cpu"
-                        body = {
-                            "iterations": min(50000000, int(8000 * workload_factor)),  # Cap at 50M
-                            "payloadSize": min(1000000, int(40000 * workload_factor))  # Cap at 1M
-                        }
-                    else:
-                        url = f"{self.base_url}/work/files"
-                        body = {
-                            "fileCount": min(500, int(12 * workload_factor)),  # Cap at 500 files
-                            "fileSizeBytes": min(10000000, int(150000 * workload_factor)),  # Cap at 10MB
-                            "prefix": f"{country}_{worker_id}"
-                        }
-                else:  # Low load: 15% CPU, 85% files
-                    if random.random() < 0.15:
-                        url = f"{self.base_url}/work/cpu"
-                        body = {
-                            "iterations": min(50000000, int(4000 * workload_factor)),  # Cap at 50M
-                            "payloadSize": min(1000000, int(20000 * workload_factor))  # Cap at 1M
-                        }
-                    else:
-                        url = f"{self.base_url}/work/files"
-                        body = {
-                            "fileCount": max(1, min(500, int(4 * workload_factor))),  # Cap at 500 files
-                            "fileSizeBytes": min(10000000, int(80000 * workload_factor)),  # Cap at 10MB
-                            "prefix": f"{country}_{worker_id}"
-                        }
+                url, body, endpoint_name, p_cpu = self.select_endpoint_and_body(workload_factor, country, worker_id)
 
                 # Make request
                 request_start_time = time.perf_counter()
@@ -161,8 +196,8 @@ class GlobalWorkloadGenerator:
 
                 end_time = time.perf_counter()
                 latency_ms = (end_time - request_start_time) * 1000.0
-
-
+                emissions_kg = self.estimate_request_emissions(latency_ms, server_power_w=200.0, pue=1.2,
+                                                               grid_g_co2_per_kwh=400.0)
                 # Record result
                 result = {
                     'timestamp': time.time(),
@@ -171,9 +206,10 @@ class GlobalWorkloadGenerator:
                     'workload_factor': workload_factor,
                     'latency_ms': latency_ms,
                     'status_code': status_code,
-                    'endpoint': 'cpu' if 'cpu' in url else 'files',
+                    'endpoint': endpoint_name,
                     'hour_local': simulated_hour,
-                    'minute_local': simulated_minute
+                    'minute_local': simulated_minute,
+                    'emissions_kg': emissions_kg,
                 }
                 await results_queue.put(result)
 

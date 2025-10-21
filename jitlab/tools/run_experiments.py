@@ -16,13 +16,14 @@ import time
 import os
 import sys
 from datetime import datetime
+from codecarbon import EmissionsTracker
 import psutil
 import re
 
-# PROJECT_DIR = "/Users/jakubpataluch/IdeaProjects/Designing-Sustainable-ICT-Systems/jitlab"
-# JAVA_HOME = "/Users/jakubpataluch/Library/Java/JavaVirtualMachines/openjdk-21.0.2/Contents/Home"
-PROJECT_DIR = "/Users/janbryczkowski/IdeaProjects/Designing Sustainable ICT Systems/jitlab"
-JAVA_HOME = "/Users/janbryczkowski/Library/Java/JavaVirtualMachines/openjdk-23.0.1/Contents/Home"
+PROJECT_DIR = "/Users/jakubpataluch/IdeaProjects/Designing-Sustainable-ICT-Systems/jitlab"
+JAVA_HOME = "/Users/jakubpataluch/Library/Java/JavaVirtualMachines/openjdk-21.0.2/Contents/Home"
+# PROJECT_DIR = "/Users/janbryczkowski/IdeaProjects/Designing Sustainable ICT Systems/jitlab"
+# JAVA_HOME = "/Users/janbryczkowski/Library/Java/JavaVirtualMachines/openjdk-23.0.1/Contents/Home"
 
 # Countries to investigate in Experiment 3
 COUNTRIES_TO_TEST = [
@@ -48,37 +49,37 @@ class ExperimentRunner:
                 'name': 'Baseline (Default JIT)',
                 'flags': [],
                 'description': 'Standard JVM with default JIT compilation'
+            },
+            'interpret_only': {
+                'name': 'Interpret-only (No JIT)',
+                'flags': ['-Xint'],
+                'description': 'No JIT compilation, pure interpretation'
+            },
+            'c2_only': {
+                'name': 'C2-only (No Tiered Compilation)',
+                'flags': ['-XX:-TieredCompilation'],
+                'description': 'Skip C1, compile directly to C2'
+            },
+            'c1_only': {
+                'name': 'C1-only (No C2 JIT)',
+                'flags': ['-XX:+TieredCompilation', '-XX:TieredStopAtLevel=1'],
+                'description': 'Stop compilation at C1 level'
+            },
+            'lower_threshold': {
+                'name': 'Lower Compile Threshold',
+                'flags': ['-XX:CompileThreshold=1000'],
+                'description': 'Compile methods sooner (lower threshold)'
+            },
+            'single_compiler': {
+                'name': 'Single Compiler Thread',
+                'flags': ['-XX:CICompilerCount=1'],
+                'description': 'Use only one compiler thread (slower warmup)'
+            },
+            'heap_sized': {
+                'name': 'Fixed Heap Size',
+                'flags': ['-Xms1g', '-Xmx1g'],
+                'description': 'Fixed heap size to stabilize GC effects'
             }
-            # 'interpret_only': {
-            #     'name': 'Interpret-only (No JIT)',
-            #     'flags': ['-Xint'],
-            #     'description': 'No JIT compilation, pure interpretation'
-            # },
-            # 'c2_only': {
-            #     'name': 'C2-only (No Tiered Compilation)',
-            #     'flags': ['-XX:-TieredCompilation'],
-            #     'description': 'Skip C1, compile directly to C2'
-            # },
-            # 'c1_only': {
-            #     'name': 'C1-only (No C2 JIT)',
-            #     'flags': ['-XX:+TieredCompilation', '-XX:TieredStopAtLevel=1'],
-            #     'description': 'Stop compilation at C1 level'
-            # },
-            # 'lower_threshold': {
-            #     'name': 'Lower Compile Threshold',
-            #     'flags': ['-XX:CompileThreshold=1000'],
-            #     'description': 'Compile methods sooner (lower threshold)'
-            # },
-            # 'single_compiler': {
-            #     'name': 'Single Compiler Thread',
-            #     'flags': ['-XX:CICompilerCount=1'],
-            #     'description': 'Use only one compiler thread (slower warmup)'
-            # },
-            # 'heap_sized': {
-            #     'name': 'Fixed Heap Size',
-            #     'flags': ['-Xms1g', '-Xmx1g'],
-            #     'description': 'Fixed heap size to stabilize GC effects'
-            # }
         }
         
         # Experiment configurations
@@ -250,11 +251,27 @@ class ExperimentRunner:
             workload_outputs[country] = os.path.join(run_dir, f"{base_name}_workload_{clean_country}.csv")
         
         monitor_output = os.path.join(run_dir, f"{base_name}_monitor.csv")
-        
+        emissions_output = os.path.join(run_dir, f"{base_name}_emissions.csv")
+
+
         # Start server
         server_process = self.start_server(jvm_config_name, jvm_config)
         if not server_process:
             return False
+
+        server_pid_to_track = server_process.pid
+
+        # Measure emissions
+        tracker = EmissionsTracker(
+            project_name=f"{experiment_name}_{jvm_config_name}",
+            output_dir=run_dir,
+            output_file=os.path.basename(emissions_output),
+            measure_power_secs=1,  # Sample every second
+            log_level="warning",
+            save_to_file=True,
+
+        )
+        tracker.start()
         
         try:
             # Start monitoring
@@ -321,7 +338,10 @@ class ExperimentRunner:
                     monitor_process.wait(timeout=10)
                 except subprocess.TimeoutExpired:
                     monitor_process.kill()
-            
+
+            tracker.stop()
+            print(f"Detailed emissions log saved to {emissions_output}")
+
             # Check if files were created
             country_files_exist = all(os.path.exists(workload_outputs[country]) for country in COUNTRIES_TO_TEST)
             if country_files_exist and os.path.exists(monitor_output):
@@ -347,6 +367,28 @@ class ExperimentRunner:
                         print("  Profiles plot not generated")
                 except Exception as e:
                     print(f"Failed to generate profiles plot: {e}")
+
+                # Generate emissions  analysis
+                try:
+                    emissions_analysis_png = os.path.join(run_dir, f"{base_name}_emissions_analysis.png")
+                    energy_analysis_png = os.path.join(run_dir, f"{base_name}_emissions_energy_analysis.png")
+                    emissions_cmd = [
+                        'python3', 'tools/analyze_emissions.py',
+                        '--emissions_csv', emissions_output,
+                        '--workload_csvs', ','.join([workload_outputs[country] for country in COUNTRIES_TO_TEST]),
+                        '--emissions_out', emissions_analysis_png,
+                        '--energy_out', energy_analysis_png
+                    ]
+                    print(f"Generating emissions analysis: {' '.join(emissions_cmd)}")
+                    subprocess.run(emissions_cmd, cwd=self.project_dir, check=False)
+                    if os.path.exists(emissions_analysis_png) and os.path.exists(energy_analysis_png):
+                        print(f"  Emissions analysis plot: {emissions_analysis_png}")
+                        print(f"  Energy analysis plot: {energy_analysis_png}")
+                    else:
+                        print("  Emissions analysis plots not generated")
+                except Exception as e:
+                    print(f"Failed to generate emissions analysis: {e}")
+
 
                 # Generate one results plot with a line per country
                 try:
