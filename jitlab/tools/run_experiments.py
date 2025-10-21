@@ -20,10 +20,10 @@ from codecarbon import EmissionsTracker
 import psutil
 import re
 
-PROJECT_DIR = "/Users/jakubpataluch/IdeaProjects/Designing-Sustainable-ICT-Systems/jitlab"
-JAVA_HOME = "/Users/jakubpataluch/Library/Java/JavaVirtualMachines/openjdk-21.0.2/Contents/Home"
-# PROJECT_DIR = "/Users/janbryczkowski/IdeaProjects/Designing Sustainable ICT Systems/jitlab"
-# JAVA_HOME = "/Users/janbryczkowski/Library/Java/JavaVirtualMachines/openjdk-23.0.1/Contents/Home"
+# PROJECT_DIR = "/Users/jakubpataluch/IdeaProjects/Designing-Sustainable-ICT-Systems/jitlab"
+# JAVA_HOME = "/Users/jakubpataluch/Library/Java/JavaVirtualMachines/openjdk-21.0.2/Contents/Home"
+PROJECT_DIR = "/Users/janbryczkowski/IdeaProjects/Designing Sustainable ICT Systems/jitlab"
+JAVA_HOME = "/Users/janbryczkowski/Library/Java/JavaVirtualMachines/openjdk-23.0.1/Contents/Home"
 
 # Countries to investigate in Experiment 3
 COUNTRIES_TO_TEST = [
