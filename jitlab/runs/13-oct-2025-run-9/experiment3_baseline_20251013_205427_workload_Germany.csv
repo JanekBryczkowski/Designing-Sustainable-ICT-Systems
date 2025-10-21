@@ -1,0 +1,4 @@
+timestamp,worker_id,country,workload_factor,latency_ms,status_code,endpoint,hour_local,minute_local
+1760381680.849787,0,Germany,0.050,154.204,200,files,2,0
+1760381680.85235,2,Germany,0.050,141.730,200,files,2,0
+1760381680.8526669,1,Germany,0.050,142.381,200,files,2,0
