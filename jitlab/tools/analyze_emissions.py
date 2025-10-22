@@ -15,10 +15,10 @@ PUE = {
 }
 
 EMISSION_FACTORS = { # kg CO2/kWh
-    'France': 0.053,
     'Germany': 0.338,
+    'France': 0.053,
+    'United States (Eastern)': 0.386,
     'Japan': 0.463,
-    'United States (Eastern)': 0.386
 }
 
 
