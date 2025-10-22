@@ -28,9 +28,9 @@ JAVA_HOME = "/Users/janbryczkowski/Library/Java/JavaVirtualMachines/openjdk-23.0
 # Countries to investigate in Experiment
 COUNTRIES_TO_TEST = [
     "Germany",
+    "France",
     "United States (Eastern)",
     "Japan",
-    "France",
 ]
 
 class ExperimentRunner:
