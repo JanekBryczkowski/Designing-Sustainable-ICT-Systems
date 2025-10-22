@@ -25,7 +25,7 @@ import re
 PROJECT_DIR = "/Users/janbryczkowski/IdeaProjects/Designing Sustainable ICT Systems/jitlab"
 JAVA_HOME = "/Users/janbryczkowski/Library/Java/JavaVirtualMachines/openjdk-23.0.1/Contents/Home"
 
-# Countries to investigate in Experiment 3
+# Countries to investigate in Experiment
 COUNTRIES_TO_TEST = [
     "Germany",
     "United States (Eastern)",
