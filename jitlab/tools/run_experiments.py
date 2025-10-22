@@ -88,7 +88,7 @@ class ExperimentRunner:
                 'name': 'Global Workload Comparison',
                 'script': 'experiment3_global_workload.py',
                 'duration': 48,  # 48 seconds
-                'workers': 3,  # per country
+                'workers': 5,  # per country
                 'description': 'Compares 24-hour workload patterns across countries'
             }
         }
