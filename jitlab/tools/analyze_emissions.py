@@ -14,8 +14,8 @@ PUE = {
     'United States (Eastern)': 1.12
 }
 
-EMISSION_FACTORS = {
-    'France': 0.053,  # kg CO2/kWh
+EMISSION_FACTORS = { # kg CO2/kWh
+    'France': 0.053,
     'Germany': 0.338,
     'Japan': 0.463,
     'United States (Eastern)': 0.386
