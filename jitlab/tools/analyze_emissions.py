@@ -8,10 +8,10 @@ import sys
 
 # --- Configuration ---
 PUE = {
-    'France': 1.15,
     'Germany': 1.10,
+    'France': 1.15,
+    'United States (Eastern)': 1.12,
     'Japan': 1.18,
-    'United States (Eastern)': 1.12
 }
 
 EMISSION_FACTORS = { # kg CO2/kWh
