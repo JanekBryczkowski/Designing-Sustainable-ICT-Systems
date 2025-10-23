@@ -20,17 +20,17 @@ from codecarbon import EmissionsTracker
 import psutil
 import re
 
-PROJECT_DIR = "/Users/jakubpataluch/IdeaProjects/Designing-Sustainable-ICT-Systems/jitlab"
-JAVA_HOME = "/Users/jakubpataluch/Library/Java/JavaVirtualMachines/openjdk-21.0.2/Contents/Home"
-# PROJECT_DIR = "/Users/janbryczkowski/IdeaProjects/Designing Sustainable ICT Systems/jitlab"
-# JAVA_HOME = "/Users/janbryczkowski/Library/Java/JavaVirtualMachines/openjdk-23.0.1/Contents/Home"
+# PROJECT_DIR = "/Users/jakubpataluch/IdeaProjects/Designing-Sustainable-ICT-Systems/jitlab"
+# JAVA_HOME = "/Users/jakubpataluch/Library/Java/JavaVirtualMachines/openjdk-21.0.2/Contents/Home"
+PROJECT_DIR = "/Users/janbryczkowski/IdeaProjects/Designing Sustainable ICT Systems/jitlab"
+JAVA_HOME = "/Users/janbryczkowski/Library/Java/JavaVirtualMachines/openjdk-23.0.1/Contents/Home"
 
-# Countries to investigate in Experiment 3
+# Countries to investigate in Experiment
 COUNTRIES_TO_TEST = [
     "Germany",
+    "France",
     "United States (Eastern)",
     "Japan",
-    "France",
 ]
 
 class ExperimentRunner:
@@ -88,7 +88,7 @@ class ExperimentRunner:
                 'name': 'Global Workload Comparison',
                 'script': 'experiment3_global_workload.py',
                 'duration': 48,  # 48 seconds
-                'workers': 3,  # per country
+                'workers': 5,  # per country
                 'description': 'Compares 24-hour workload patterns across countries'
             }
         }
